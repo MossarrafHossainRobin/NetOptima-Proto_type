@@ -1,11 +1,5 @@
-// Chart data for different time ranges
+ // Chart data for different time ranges
         let chartData = {
-            'live': {
-                labels: [],
-                upload: [],
-                download: [],
-                title: 'Network Traffic (Live)'
-            },
             '1hour': {
                 labels: [],
                 upload: [],
@@ -13,28 +7,43 @@
                 title: 'Network Traffic (Last 1 Hour)'
             },
             '24hours': {
-                labels: [],
-                upload: [],
-                download: [],
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+                upload: [120, 89, 156, 234, 298, 267, 189],
+                download: [340, 267, 445, 678, 823, 756, 534],
                 title: 'Network Traffic (Last 24 Hours)'
             },
             '7days': {
-                labels: [],
-                upload: [],
-                download: [],
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                upload: [1200, 1450, 1320, 1680, 1890, 1560, 1340],
+                download: [3400, 3890, 3560, 4200, 4560, 3980, 3450],
                 title: 'Network Traffic (Last 7 Days)'
             },
             '30days': {
-                labels: [],
-                upload: [],
-                download: [],
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                upload: [8400, 9200, 8800, 9600],
+                download: [24500, 26800, 25200, 27400],
                 title: 'Network Traffic (Last 30 Days)'
             }
         };
 
+        // Initialize 1-hour data with current time
+        function initializeHourlyData() {
+            const now = new Date();
+            for (let i = 11; i >= 0; i--) {
+                const time = new Date(now.getTime() - i * 5 * 60000); // 5-minute intervals
+                const timeStr = time.getHours().toString().padStart(2, '0') + ':' + 
+                               time.getMinutes().toString().padStart(2, '0');
+                chartData['1hour'].labels.push(timeStr);
+                chartData['1hour'].upload.push(Math.floor(Math.random() * 200) + 100);
+                chartData['1hour'].download.push(Math.floor(Math.random() * 400) + 300);
+            }
+        }
+
+        initializeHourlyData();
+
         // Initialize traffic chart
         const ctx = document.getElementById('trafficChart').getContext('2d');
-        let currentTimeRange = 'live';
+        let currentTimeRange = '24hours';
         
         const trafficChart = new Chart(ctx, {
             type: 'line',
@@ -93,215 +102,6 @@
             }
         });
 
-        // Network info for real-time updates
-        let previousBandwidth = null;
-        let previousLatency = null;
-        let deviceData = [];
-        let ipConnections = [];
-        let securityAlerts = [];
-
-        async function updateNetworkInfo() {
-            let currentBandwidth = 0;
-            let currentLatency = 0;
-            let packetLoss = 0;
-            
-            // Measure packet loss with 10 ping attempts
-            const attempts = 10;
-            let failures = 0;
-            for (let i = 0; i < attempts; i++) {
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 2000);
-                    await fetch('https://www.google.com/generate_204', { signal: controller.signal });
-                    clearTimeout(timeoutId);
-                } catch (e) {
-                    failures++;
-                }
-            }
-            packetLoss = ((failures / attempts) * 100).toFixed(2);
-            
-            if ('connection' in navigator) {
-                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                currentBandwidth = connection.downlink;
-                currentLatency = connection.rtt;
-            } else {
-                // Fallback for latency
-                const start = performance.now();
-                try {
-                    await fetch('https://www.google.com/generate_204');
-                    currentLatency = Math.round(performance.now() - start);
-                } catch (e) {
-                    currentLatency = 'N/A';
-                }
-                currentBandwidth = 'N/A';
-            }
-
-            // Update DOM
-            const bandwidthElem = document.getElementById('bandwidth');
-            const latencyElem = document.getElementById('latency');
-            const packetLossElem = document.getElementById('packetLoss');
-            const devicesElem = document.getElementById('devices');
-            const bandwidthChange = bandwidthElem.nextElementSibling;
-            const latencyChange = latencyElem.nextElementSibling;
-            const packetLossChange = packetLossElem.nextElementSibling;
-            const devicesChange = devicesElem.nextElementSibling;
-
-            if (currentBandwidth !== 'N/A') {
-                bandwidthElem.textContent = `${currentBandwidth} Mbps`;
-                if (currentTimeRange === 'live') {
-                    const now = new Date().toLocaleTimeString();
-                    chartData['live'].labels.push(now);
-                    chartData['live'].upload.push(Math.floor(currentBandwidth * 0.3)); // Assume upload is ~30% of download
-                    chartData['live'].download.push(currentBandwidth);
-                    if (chartData['live'].labels.length > 20) {
-                        chartData['live'].labels.shift();
-                        chartData['live'].upload.shift();
-                        chartData['live'].download.shift();
-                    }
-                    trafficChart.data.labels = chartData['live'].labels;
-                    trafficChart.data.datasets[0].data = chartData['live'].upload;
-                    trafficChart.data.datasets[1].data = chartData['live'].download;
-                    trafficChart.update('none');
-                }
-                if (previousBandwidth !== null) {
-                    const diff = ((currentBandwidth - previousBandwidth) / previousBandwidth * 100).toFixed(0);
-                    const sign = diff > 0 ? '↑' : '↓';
-                    bandwidthChange.textContent = `${sign} ${Math.abs(diff)}% change`;
-                    bandwidthChange.classList.remove('text-green-600', 'text-red-600', 'text-gray-600');
-                    bandwidthChange.classList.add(diff >= 0 ? 'text-green-600' : 'text-red-600');
-                } else {
-                    bandwidthChange.textContent = 'Current bandwidth';
-                    bandwidthChange.classList.add('text-gray-600');
-                }
-                previousBandwidth = currentBandwidth;
-            }
-            if (currentLatency !== 'N/A') {
-                latencyElem.textContent = `${currentLatency}ms`;
-                if (previousLatency !== null) {
-                    const diff = currentLatency - previousLatency;
-                    const sign = diff > 0 ? '↑' : '↓';
-                    latencyChange.textContent = `${sign} ${Math.abs(diff)}ms change`;
-                    latencyChange.classList.remove('text-green-600', 'text-red-600', 'text-gray-600');
-                    latencyChange.classList.add(diff <= 0 ? 'text-green-600' : 'text-red-600');
-                } else {
-                    latencyChange.textContent = 'Current latency';
-                    latencyChange.classList.add('text-gray-600');
-                }
-                previousLatency = currentLatency;
-            }
-            packetLossElem.textContent = `${packetLoss}%`;
-            devicesElem.textContent = '1';
-            devicesChange.textContent = `${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'} device`;
-        }
-
-        // Fetch network devices (replace with actual API)
-        async function fetchNetworkDevices() {
-            try {
-                const response = await fetch('YOUR_API_URL/devices', {
-                    headers: {
-                        'Authorization': 'Bearer YOUR_API_KEY_HERE'
-                    }
-                });
-                const data = await response.json();
-                deviceData = data.devices.map((device, index) => ({
-                    id: index + 1,
-                    name: device.name || `Device ${index + 1}`,
-                    ip: device.ip || `192.168.1.${index + 100}`,
-                    mac: device.mac || `00:1B:44:11:3A:${index.toString(16).padStart(2, '0')}`,
-                    type: device.type || 'unknown',
-                    category: device.category || 'Unknown',
-                    activity: device.activity || 'Unknown',
-                    bandwidth: device.bandwidth || 0,
-                    bandwidthLimit: device.bandwidthLimit || 100,
-                    status: device.status || 'active',
-                    color: device.color || 'blue',
-                    lastSeen: new Date(device.lastSeen || Date.now())
-                }));
-            } catch (e) {
-                // Fallback to current device
-                deviceData = [{
-                    id: 1,
-                    name: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop Device',
-                    ip: '192.168.1.100',
-                    mac: '00:1B:44:11:3A:00',
-                    type: navigator.userAgent.includes('Mobile') ? 'mobile' : 'computer',
-                    category: navigator.userAgent.includes('Mobile') ? 'Mobile Device' : 'Workstation',
-                    activity: 'Web browsing',
-                    bandwidth: 0,
-                    bandwidthLimit: 100,
-                    status: 'active',
-                    color: 'blue',
-                    lastSeen: new Date()
-                }];
-            }
-            renderTopDevices();
-        }
-
-        // Fetch IP connections (replace with actual API)
-        async function fetchIPConnections() {
-            try {
-                const response = await fetch('YOUR_API_URL/connections', {
-                    headers: {
-                        'Authorization': 'Bearer YOUR_API_KEY_HERE'
-                    }
-                });
-                const data = await response.json();
-                ipConnections = data.connections.map((conn, index) => ({
-                    id: index + 1,
-                    ip: conn.ip,
-                    location: conn.location || 'Unknown',
-                    connections: conn.connections || 0,
-                    dataTransfer: conn.dataTransfer || '0 MB',
-                    status: conn.status || 'unknown',
-                    riskLevel: conn.riskLevel || 'low',
-                    lastActivity: new Date(conn.lastActivity || Date.now()),
-                    blocked: conn.blocked || false,
-                    suspicious: conn.suspicious || false
-                }));
-            } catch (e) {
-                // Fallback to public IP
-                const publicIP = await fetch('https://ipinfo.io/json?token=0fdb2c830ee90a').then(res => res.json());
-                ipConnections = [{
-                    id: 1,
-                    ip: publicIP.ip,
-                    location: `${publicIP.city}, ${publicIP.country}`,
-                    connections: 1,
-                    dataTransfer: '0 MB',
-                    status: 'trusted',
-                    riskLevel: 'low',
-                    lastActivity: new Date(),
-                    blocked: false,
-                    suspicious: false
-                }];
-            }
-            renderIPConnections();
-            updateIPStats();
-        }
-
-        // Fetch security alerts (replace with actual API)
-        async function fetchSecurityAlerts() {
-            try {
-                const response = await fetch('YOUR_API_URL/alerts', {
-                    headers: {
-                        'Authorization': 'Bearer YOUR_API_KEY_HERE'
-                    }
-                });
-                const data = await response.json();
-                securityAlerts = data.alerts.map((alert, index) => ({
-                    id: index + 1,
-                    type: alert.type || 'intrusion',
-                    severity: alert.severity || 'low',
-                    message: alert.message || 'Security event detected',
-                    device: alert.device || 'Unknown',
-                    timestamp: new Date(alert.timestamp || Date.now()),
-                    status: alert.status || 'active'
-                }));
-            } catch (e) {
-                securityAlerts = [];
-            }
-            renderSecurityAlerts();
-        }
-
         // Function to update chart data
         function updateChart(timeRange) {
             currentTimeRange = timeRange;
@@ -315,34 +115,267 @@
             document.getElementById('chartTitle').textContent = data.title;
         }
 
-        // Add IP card with ipinfo.io
-        function addIPCard() {
-            fetch('https://ipinfo.io/json?token=0fdb2c830ee90a')
-                .then(res => res.json())
-                .then(data => {
-                    const grid = document.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.lg\\:grid-cols-4');
-                    const newCard = document.createElement('div');
-                    newCard.className = 'bg-white rounded-xl p-6 card-shadow metric-card';
-                    newCard.innerHTML = `
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-sm font-medium text-gray-600">Public IP Address</p>
-                                <p class="text-2xl font-bold text-gray-900">${data.ip}</p>
-                                <p class="text-xs text-gray-500 mt-1">${data.city}, ${data.country} • ${data.org}</p>
-                            </div>
-                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                            </div>
-                        </div>
-                    `;
-                    grid.appendChild(newCard);
-                    grid.classList.remove('lg:grid-cols-4');
-                    grid.classList.add('lg:grid-cols-5');
-                })
-                .catch(err => console.error('Error fetching IP info:', err));
-        }
+        // Time range selector event listener
+        document.getElementById('timeRange').addEventListener('change', function() {
+            updateChart(this.value);
+        });
+
+        // Device data for live updates with management features
+        let deviceData = [
+            {
+                id: 1,
+                name: 'Conference Room PC',
+                ip: '192.168.1.45',
+                mac: '00:1B:44:11:3A:B7',
+                type: 'computer',
+                category: 'Workstation',
+                activity: 'Video streaming',
+                bandwidth: 234,
+                bandwidthLimit: 500,
+                status: 'active',
+                color: 'blue',
+                lastSeen: new Date()
+            },
+            {
+                id: 2,
+                name: 'IoT Sensors Hub',
+                ip: '192.168.1.78',
+                mac: '00:1B:44:11:3A:C8',
+                type: 'iot',
+                category: 'IoT Device',
+                activity: 'Data sync',
+                bandwidth: 156,
+                bandwidthLimit: 200,
+                status: 'active',
+                color: 'green',
+                lastSeen: new Date()
+            },
+            {
+                id: 3,
+                name: 'Security Cameras',
+                ip: '192.168.1.89',
+                mac: '00:1B:44:11:3A:D9',
+                type: 'camera',
+                category: 'Security',
+                activity: 'Video upload',
+                bandwidth: 89,
+                bandwidthLimit: 150,
+                status: 'active',
+                color: 'purple',
+                lastSeen: new Date()
+            },
+            {
+                id: 4,
+                name: 'Smart Thermostat',
+                ip: '192.168.1.92',
+                mac: '00:1B:44:11:3A:EA',
+                type: 'iot',
+                category: 'IoT Device',
+                activity: 'Temperature sync',
+                bandwidth: 12,
+                bandwidthLimit: 50,
+                status: 'active',
+                color: 'orange',
+                lastSeen: new Date()
+            },
+            {
+                id: 5,
+                name: 'WiFi Printer',
+                ip: '192.168.1.156',
+                mac: '00:1B:44:11:3A:FB',
+                type: 'printer',
+                category: 'Office Equipment',
+                activity: 'Print jobs',
+                bandwidth: 8,
+                bandwidthLimit: 100,
+                status: 'active',
+                color: 'gray',
+                lastSeen: new Date()
+            },
+            {
+                id: 6,
+                name: 'iPhone 14 Pro',
+                ip: '192.168.1.123',
+                mac: '00:1B:44:11:3B:0C',
+                type: 'mobile',
+                category: 'Mobile Device',
+                activity: 'Social media',
+                bandwidth: 45,
+                bandwidthLimit: 200,
+                status: 'active',
+                color: 'blue',
+                lastSeen: new Date()
+            },
+            {
+                id: 7,
+                name: 'Samsung Smart TV',
+                ip: '192.168.1.167',
+                mac: '00:1B:44:11:3B:1D',
+                type: 'tv',
+                category: 'Entertainment',
+                activity: 'Netflix streaming',
+                bandwidth: 78,
+                bandwidthLimit: 300,
+                status: 'paused',
+                color: 'red',
+                lastSeen: new Date(Date.now() - 300000)
+            }
+        ];
+
+        // IP connections data for monitoring
+        let ipConnections = [
+            {
+                id: 1,
+                ip: '142.250.191.14',
+                location: 'Mountain View, CA (Google)',
+                connections: 45,
+                dataTransfer: '2.3 MB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 2,
+                ip: '157.240.22.35',
+                location: 'Menlo Park, CA (Meta)',
+                connections: 23,
+                dataTransfer: '1.8 MB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 3,
+                ip: '185.199.108.153',
+                location: 'San Francisco, CA (GitHub)',
+                connections: 12,
+                dataTransfer: '890 KB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 4,
+                ip: '91.189.95.83',
+                location: 'Unknown Location',
+                connections: 156,
+                dataTransfer: '15.2 MB',
+                status: 'suspicious',
+                riskLevel: 'high',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: true
+            },
+            {
+                id: 5,
+                ip: '203.0.113.45',
+                location: 'Beijing, China',
+                connections: 89,
+                dataTransfer: '8.7 MB',
+                status: 'suspicious',
+                riskLevel: 'medium',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: true
+            },
+            {
+                id: 6,
+                ip: '198.51.100.22',
+                location: 'Moscow, Russia',
+                connections: 234,
+                dataTransfer: '25.4 MB',
+                status: 'blocked',
+                riskLevel: 'critical',
+                lastActivity: new Date(Date.now() - 600000),
+                blocked: true,
+                suspicious: true
+            },
+            {
+                id: 7,
+                ip: '104.16.132.229',
+                location: 'San Francisco, CA (Cloudflare)',
+                connections: 34,
+                dataTransfer: '3.2 MB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 8,
+                ip: '52.84.150.25',
+                location: 'Virginia, US (AWS)',
+                connections: 67,
+                dataTransfer: '5.8 MB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 9,
+                ip: '172.217.14.110',
+                location: 'Mountain View, CA (Google)',
+                connections: 28,
+                dataTransfer: '2.1 MB',
+                status: 'trusted',
+                riskLevel: 'low',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: false
+            },
+            {
+                id: 10,
+                ip: '46.229.168.146',
+                location: 'Unknown Location',
+                connections: 78,
+                dataTransfer: '6.9 MB',
+                status: 'suspicious',
+                riskLevel: 'medium',
+                lastActivity: new Date(),
+                blocked: false,
+                suspicious: true
+            }
+        ];
+
+        // Security alerts data
+        let securityAlerts = [
+            {
+                id: 1,
+                type: 'intrusion',
+                severity: 'high',
+                message: 'Suspicious login attempt detected',
+                device: '192.168.1.234',
+                timestamp: new Date(Date.now() - 120000),
+                status: 'active'
+            },
+            {
+                id: 2,
+                type: 'firewall',
+                severity: 'medium',
+                message: 'Blocked 15 malicious requests',
+                device: 'Firewall',
+                timestamp: new Date(Date.now() - 300000),
+                status: 'resolved'
+            },
+            {
+                id: 3,
+                type: 'vpn',
+                severity: 'low',
+                message: 'VPN connection recommended for remote work',
+                device: 'System',
+                timestamp: new Date(Date.now() - 600000),
+                status: 'pending'
+            }
+        ];
 
         // Function to get device icon
         function getDeviceIcon(type) {
@@ -391,7 +424,7 @@
             const container = document.getElementById('topDevices');
             const sortedDevices = [...deviceData].sort((a, b) => b.bandwidth - a.bandwidth).slice(0, 3);
             
-            container.innerHTML = sortedDevices.length ? sortedDevices.map(device => `
+            container.innerHTML = sortedDevices.map(device => `
                 <div class="p-3 bg-gray-50 rounded-lg border ${device.status === 'paused' ? 'border-red-200 bg-red-50' : 'border-gray-200'}">
                     <div class="flex items-center justify-between mb-2">
                         <div class="flex items-center space-x-3">
@@ -427,11 +460,7 @@
                         </div>
                     </div>
                 </div>
-            `).join('') : `
-                <div class="text-center py-4">
-                    <p class="text-sm text-gray-600">No devices detected</p>
-                </div>
-            `;
+            `).join('');
         }
 
         // Function to render security alerts
@@ -543,6 +572,7 @@
 
         function enableAutoBlock() {
             alert('Auto-block enabled! IPs with more than 100 connections or high risk levels will be automatically blocked.');
+            // Simulate auto-blocking high-risk IPs
             ipConnections.forEach(ip => {
                 if ((ip.connections > 100 || ip.riskLevel === 'critical') && !ip.blocked) {
                     ip.blocked = true;
@@ -554,9 +584,12 @@
         }
 
         function whitelistTrusted() {
+            const trustedDomains = ['Google', 'Meta', 'GitHub', 'Cloudflare', 'AWS', 'Microsoft'];
             let whitelistedCount = 0;
             ipConnections.forEach(ip => {
-                if (ip.status === 'trusted' && ip.suspicious) {
+                const isTrustedDomain = trustedDomains.some(domain => ip.location.includes(domain));
+                if (isTrustedDomain && ip.status !== 'trusted') {
+                    ip.status = 'trusted';
                     ip.suspicious = false;
                     ip.riskLevel = 'low';
                     whitelistedCount++;
@@ -564,7 +597,7 @@
             });
             renderIPConnections();
             updateIPStats();
-            alert(`${whitelistedCount} IPs have been whitelisted.`);
+            alert(`${whitelistedCount} IPs from trusted domains have been whitelisted.`);
         }
 
         // Function to render IP connections table
@@ -586,7 +619,7 @@
                 return matchesFilter && matchesSearch;
             });
 
-            container.innerHTML = filteredIPs.length ? filteredIPs.map(ip => {
+            container.innerHTML = filteredIPs.map(ip => {
                 const statusColors = {
                     trusted: 'green',
                     suspicious: 'yellow',
@@ -638,11 +671,7 @@
                         </td>
                     </tr>
                 `;
-            }).join('') : `
-                <tr>
-                    <td colspan="6" class="text-center py-4 text-sm text-gray-600">No IP connections detected</td>
-                </tr>
-            `;
+            }).join('');
         }
 
         // Function to update IP statistics
@@ -652,10 +681,10 @@
             const suspiciousCount = ipConnections.filter(ip => ip.suspicious && !ip.blocked).length;
             const ddosAttempts = ipConnections.filter(ip => ip.connections > 150).length;
             
-            document.getElementById('totalConnections').textContent = totalConnections || 0;
-            document.getElementById('blockedIps').textContent = blockedCount || 0;
-            document.getElementById('suspiciousIps').textContent = suspiciousCount || 0;
-            document.getElementById('ddosAttempts').textContent = ddosAttempts || 0;
+            document.getElementById('totalConnections').textContent = totalConnections;
+            document.getElementById('blockedIps').textContent = blockedCount;
+            document.getElementById('suspiciousIps').textContent = suspiciousCount;
+            document.getElementById('ddosAttempts').textContent = ddosAttempts;
             
             // Update threat level
             const threatLevelElement = document.getElementById('threatLevel');
@@ -738,12 +767,134 @@
             document.body.appendChild(modal);
         }
 
-        // Update metrics (minimal, as most updates are in fetch functions)
-        function updateMetrics() {
-            fetchNetworkDevices();
-            fetchIPConnections();
-            fetchSecurityAlerts();
+        // Function to update live chart data
+        function updateLiveChartData() {
+            // Only update if we're viewing 1-hour or 24-hour data (live data)
+            if (currentTimeRange === '1hour') {
+                // Add new data point and remove oldest for 1-hour view
+                const now = new Date();
+                const timeStr = now.getHours().toString().padStart(2, '0') + ':' + 
+                               now.getMinutes().toString().padStart(2, '0');
+                
+                chartData['1hour'].labels.shift();
+                chartData['1hour'].labels.push(timeStr);
+                
+                chartData['1hour'].upload.shift();
+                chartData['1hour'].upload.push(Math.floor(Math.random() * 200) + 100);
+                
+                chartData['1hour'].download.shift();
+                chartData['1hour'].download.push(Math.floor(Math.random() * 400) + 300);
+                
+                // Update chart
+                trafficChart.data.labels = chartData['1hour'].labels;
+                trafficChart.data.datasets[0].data = chartData['1hour'].upload;
+                trafficChart.data.datasets[1].data = chartData['1hour'].download;
+                trafficChart.update('none');
+            } else if (currentTimeRange === '24hours') {
+                // Update current data points for 24-hour view
+                const currentHour = new Date().getHours();
+                const dataIndex = Math.floor(currentHour / 4); // Map to 6 data points
+                
+                if (dataIndex < chartData['24hours'].upload.length) {
+                    chartData['24hours'].upload[dataIndex] += Math.floor(Math.random() * 20) - 10;
+                    chartData['24hours'].download[dataIndex] += Math.floor(Math.random() * 40) - 20;
+                    
+                    // Keep values in reasonable range
+                    chartData['24hours'].upload[dataIndex] = Math.max(50, Math.min(400, chartData['24hours'].upload[dataIndex]));
+                    chartData['24hours'].download[dataIndex] = Math.max(200, Math.min(1000, chartData['24hours'].download[dataIndex]));
+                    
+                    // Update chart
+                    trafficChart.data.datasets[0].data = chartData['24hours'].upload;
+                    trafficChart.data.datasets[1].data = chartData['24hours'].download;
+                    trafficChart.update('none');
+                }
+            }
         }
+
+        // Simulate real-time updates
+        function updateMetrics() {
+            const bandwidth = document.getElementById('bandwidth');
+            const latency = document.getElementById('latency');
+            const packetLoss = document.getElementById('packetLoss');
+            const devices = document.getElementById('devices');
+            const healthScore = document.getElementById('healthScore');
+
+            // Simulate small variations in metrics
+            const currentBandwidth = parseInt(bandwidth.textContent);
+            const newBandwidth = currentBandwidth + Math.floor(Math.random() * 20) - 10;
+            bandwidth.textContent = Math.max(800, Math.min(900, newBandwidth)) + ' Mbps';
+
+            const currentLatency = parseInt(latency.textContent);
+            const newLatency = currentLatency + Math.floor(Math.random() * 6) - 3;
+            latency.textContent = Math.max(15, Math.min(35, newLatency)) + 'ms';
+
+            const currentLoss = parseFloat(packetLoss.textContent);
+            const newLoss = (currentLoss + (Math.random() * 0.02) - 0.01).toFixed(2);
+            packetLoss.textContent = Math.max(0, Math.min(0.1, newLoss)) + '%';
+
+            // Update device count with small variations
+            const currentDevices = parseInt(devices.textContent);
+            const deviceChange = Math.random() < 0.1 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+            const newDeviceCount = Math.max(40, Math.min(55, currentDevices + deviceChange));
+            devices.textContent = newDeviceCount;
+
+            // Update device bandwidth usage
+            deviceData.forEach(device => {
+                const variation = Math.floor(Math.random() * 20) - 10;
+                device.bandwidth = Math.max(5, device.bandwidth + variation);
+                
+                // Occasionally change activity
+                if (Math.random() < 0.1) {
+                    const activities = {
+                        computer: ['Video streaming', 'File download', 'Web browsing', 'Video call'],
+                        iot: ['Data sync', 'Status update', 'Sensor reading', 'Firmware update'],
+                        camera: ['Video upload', 'Motion detection', 'Live streaming', 'Recording'],
+                        printer: ['Print jobs', 'Scanning', 'Idle', 'Maintenance'],
+                        orange: ['Temperature sync', 'Schedule update', 'Energy monitoring', 'Climate control']
+                    };
+                    const typeActivities = activities[device.type] || activities.iot;
+                    device.activity = typeActivities[Math.floor(Math.random() * typeActivities.length)];
+                }
+            });
+
+            // Update IP connections
+            ipConnections.forEach(ip => {
+                if (!ip.blocked) {
+                    const variation = Math.floor(Math.random() * 10) - 5;
+                    ip.connections = Math.max(1, ip.connections + variation);
+                    ip.lastActivity = new Date();
+                    
+                    // Occasionally add new suspicious activity
+                    if (Math.random() < 0.05 && !ip.suspicious) {
+                        ip.connections += Math.floor(Math.random() * 50) + 20;
+                        if (ip.connections > 80) {
+                            ip.suspicious = true;
+                            ip.status = 'suspicious';
+                            ip.riskLevel = ip.connections > 150 ? 'high' : 'medium';
+                        }
+                    }
+                }
+            });
+
+            // Update IP stats
+            updateIPStats();
+
+            // Re-render devices
+            renderTopDevices();
+
+            // Update health score based on metrics
+            const score = Math.floor(90 - (newLatency - 15) - (newLoss * 100));
+            healthScore.textContent = Math.max(75, Math.min(95, score));
+
+            // Update live chart data
+            updateLiveChartData();
+        }
+
+        // Initialize displays
+        renderTopDevices();
+        renderSecurityAlerts();
+        renderIPConnections();
+        updateIPStats();
 
         // Modal functions
         function showDeviceManagementModal() {
@@ -760,7 +911,7 @@
                         </button>
                     </div>
                     <div class="space-y-3">
-                        ${deviceData.length ? deviceData.map(device => `
+                        ${deviceData.map(device => `
                             <div class="p-4 border rounded-lg ${device.status === 'paused' ? 'border-red-200 bg-red-50' : 'border-gray-200'}">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-4">
@@ -789,11 +940,7 @@
                                     </div>
                                 </div>
                             </div>
-                        `).join('') : `
-                            <div class="text-center py-4">
-                                <p class="text-sm text-gray-600">No devices detected</p>
-                            </div>
-                        `}
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -857,30 +1004,50 @@
             document.body.appendChild(modal);
         }
 
-        // Initialize displays
-        addIPCard();
-        updateNetworkInfo();
-        fetchNetworkDevices();
-        fetchIPConnections();
-        fetchSecurityAlerts();
+        // Update metrics every 5 seconds
+        setInterval(updateMetrics, 5000);
 
-        // Update every 10 seconds
+        // Generate new security alerts occasionally
         setInterval(() => {
-            updateNetworkInfo();
-            updateMetrics();
-        }, 10000);
-
-        // Listen for network changes
-        if ('connection' in navigator) {
-            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-            connection.addEventListener('change', updateNetworkInfo);
-        }
+            if (Math.random() < 0.1) { // 10% chance every 30 seconds
+                const alertTypes = ['intrusion', 'firewall', 'vpn'];
+                const severities = ['high', 'medium', 'low'];
+                const messages = {
+                    intrusion: ['Suspicious login attempt detected', 'Multiple failed authentication attempts', 'Unusual traffic pattern detected'],
+                    firewall: ['Blocked malicious requests', 'Port scan attempt blocked', 'Suspicious outbound connection blocked'],
+                    vpn: ['VPN connection recommended', 'Unsecured connection detected', 'Remote access security alert']
+                };
+                
+                const type = alertTypes[Math.floor(Math.random() * alertTypes.length)];
+                const severity = severities[Math.floor(Math.random() * severities.length)];
+                const message = messages[type][Math.floor(Math.random() * messages[type].length)];
+                
+                securityAlerts.push({
+                    id: Date.now(),
+                    type: type,
+                    severity: severity,
+                    message: message,
+                    device: `192.168.1.${Math.floor(Math.random() * 254) + 1}`,
+                    timestamp: new Date(),
+                    status: 'active'
+                });
+                
+                renderSecurityAlerts();
+            }
+        }, 30000);
 
         // Add click handlers for buttons
         document.getElementById('manageDevicesBtn').addEventListener('click', showDeviceManagementModal);
         document.getElementById('securityToolsBtn').addEventListener('click', showSecurityToolsModal);
         document.getElementById('refreshIpsBtn').addEventListener('click', function() {
-            fetchIPConnections();
+            // Simulate refreshing IP data
+            ipConnections.forEach(ip => {
+                ip.connections += Math.floor(Math.random() * 10) - 5;
+                ip.connections = Math.max(1, ip.connections);
+                ip.lastActivity = new Date();
+            });
+            renderIPConnections();
+            updateIPStats();
             this.textContent = 'Refreshed ✓';
             setTimeout(() => {
                 this.textContent = 'Refresh IPs';
@@ -901,7 +1068,7 @@
                     this.classList.add('opacity-50');
                     this.disabled = true;
                 } else if (this.textContent.includes('View Details')) {
-                    alert('Bandwidth Details:\n\nNo detailed breakdown available without network API.\n\nRecommendation: Integrate with a network management API for detailed device data.');
+                    alert('Bandwidth Details:\n\nIoT Sensors: 45%\nSecurity Cameras: 25%\nWorkstations: 15%\n\nRecommendation: Consider upgrading to higher bandwidth plan or implement traffic shaping.');
                 }
             });
         });
